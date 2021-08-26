@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+  namespace: multi-container-demo
+  labels:
+    app: demo-multi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-multi
+  template:
+    metadata:
+      labels:
+        # Apply this label to pods(should match deployment label)
+        app: demo-multi
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:latest
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "rootpass"
+        - name: MYSQL_DATABASE
+          value: "items"
+        - name: MYSQL_USER
+          value: "user1"
+        - name: MYSQL_PASSWORD
+          value: "mypass"
+        ports:
+        - name: mysql
+          containerPort: 3306
+          protocol: TCP
+        volumeMounts:
+        - name: mysql-initdb
+          mountPath: /docker-entrypoint-initdb.d
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-initdb
+        configMap:
+          name: mysql-initdb-configmap
+      - name: mysql-storage
+        emptyDir: {}
