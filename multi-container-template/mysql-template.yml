@@ -1,0 +1,113 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: mysql-template
+  annotations:
+    description: "Description"
+    tags: "database,mysql"
+objects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: mysql-initdb-configmap
+  data:
+    initdb.sql: |
+      CREATE TABLE Courses (id int(11) NOT NULL,  name varchar(255) DEFAULT NULL, code varchar(255) DEFAULT NULL, PRIMARY KEY (id));
+      insert into Courses (id, name, code) values (1,'Systems Administration - III','RH294');
+      insert into Courses (id, name, code) values (2,'Ansible Automation: Best Practices','DO447');
+      insert into Courses (id, name, code) values (3,'OpenShift Administration - I','DO180');
+      insert into Courses (id, name, code) values (4,'Openshift Administration - II','DO280');
+      ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'rootpass';
+      ALTER USER 'root' IDENTIFIED WITH mysql_native_password BY 'rootpass';
+
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: mysql-db
+    labels:
+      app: demo-multi
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: tmpl-mysql
+    template:
+      metadata:
+        labels:
+          app: tmpl-mysql
+      spec:
+        containers:
+        - name: mysql
+          image: mysql:latest
+          env:
+          - name: MYSQL_ROOT_PASSWORD
+            value: ${MYSQL_ROOT_PASSWORD}
+          - name: MYSQL_DATABASE
+            value: ${MYSQL_DATABASE}
+          - name: MYSQL_USER
+            value: ${MYSQL_USER}
+          - name: MYSQL_PASSWORD
+            value: ${MYSQL_PASSWORD}
+          ports:
+          - name: mysql
+            containerPort: 3306
+            protocol: TCP
+          volumeMounts:
+          - name: mysql-initdb
+            mountPath: /docker-entrypoint-initdb.d
+          - name: mysql-storage
+            mountPath: /var/lib/mysql
+
+        volumes:
+        - name: mysql-initdb
+          configMap:
+            name: mysql-initdb-configmap
+        - name: mysql-storage
+          emptyDir: {}
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${MYSQL_SERVICE}
+    labels:
+      app: demo-mysql
+  spec:
+    ports:
+    - port: 3306
+    selector:
+      app: tmpl-mysql
+    type: ClusterIP
+
+
+parameters:
+- description: Username for MySQL user that will be used for accessing the database.
+  displayName: MySQL Connection Username
+  from: user[A-Z0-9]{3}
+  generate: expression
+  name: MYSQL_USER
+  required: true
+- description: Password for the MySQL connection user.
+  displayName: MySQL Connection Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: MYSQL_PASSWORD
+  required: true
+- description: Password for the MySQL root user.
+  displayName: MySQL root user Password
+  from: '[a-zA-Z0-9]{16}'
+  generate: expression
+  name: MYSQL_ROOT_PASSWORD
+  required: true
+- description: Name of the MySQL database accessed.
+  displayName: MySQL Database Name
+  name: MYSQL_DATABASE
+  required: true
+  value: sampledb
+- description: Service name for the MySQl database.
+  displayName: MySQL Service Name
+  name: MYSQL_SERVICE
+  from: 'mysqlsvc-[a-z0-9]{5}'
+  generate: expression
+  required: true
+labels:
+  mysql: master
